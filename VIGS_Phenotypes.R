@@ -8,28 +8,29 @@ phenotypes <- c("Vegetative",
                 "Flower Buds",
                 "Flower1",
                 "Flower2",
-                "Flower3")
+                "Flower3",
+                "Fruit")
 phenos$Construct <- factor(phenos$Construct, 
                            levels = c("Wild-Type", "Empty Vector", "euFULI", "euFULII", "Abeer"))
 phenos$InfiltrationLocation <- factor(phenos$InfiltrationLocation,
                                        levels = c("Rosette", "Cauline"))
-phenos$Nov6 <- factor(phenos$Nov6,
-                             levels = phenotypes)
-phenos$Nov9 <- factor(phenos$Nov9,
-                             levels = phenotypes)
+phenos[,4:7] <-lapply(phenos[,4:7], FUN=function(i) factor(i, levels=phenotypes))
 
-max(factor(phenos$Nov9, ordered=TRUE))
-phenos$Nov9Mod <- ifelse(grepl("Flower*", phenos$Nov9),"3", phenos$Nov9)
+max(factor(phenos$Nov14, ordered=TRUE))
+phenos$Nov14Mod <- ifelse(grepl("Flower*|Fruit", phenos$Nov14),"3", phenos$Nov14)
 
 # Make a linear model of the data
-lm.phenos1 <- lm(as.numeric(Nov9Mod) ~ Construct*InfiltrationLocation,
+lm.phenos1 <- lm(as.numeric(Nov14Mod) ~ Construct*InfiltrationLocation,
                 data = phenos)
-lm.phenos2 <- lm(as.numeric(Nov9) ~ Construct,
+lm.phenos2 <- lm(as.numeric(Nov14) ~ Construct,
                  data = phenos,
                  subset = InfiltrationLocation == "Rosette")
 
 summary(lm.phenos1)
 summary(lm.phenos2)
+
+anova(lm.phenos1)
+anova(lm.phenos2)
 
 TukeyHSD(aov(lm.phenos1))
 TukeyHSD(aov(lm.phenos2))
