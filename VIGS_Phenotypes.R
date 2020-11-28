@@ -59,7 +59,7 @@ lm.phenos1 <- lm(as.numeric(D2Bolt) ~ Construct*InfiltrationLocation,
                 data = phenos)
 lm.phenos2 <- lm(as.numeric(D2Bolt) ~ Construct,
                  data = phenos,
-                 subset = InfiltrationLocation == "Rosette")
+                 subset = InfiltrationLocation=="Rosette")
 lm.phenos3 <- lm(n ~ Date*Stage,
                  data = phenos.cast,
                  subset = Construct == "euFULII")
@@ -91,7 +91,7 @@ names(glm.phenos1) <- unique(phenos$InfiltrationLocation)
 # Show ANOVA tables
 nb.anova1 <- lapply(glm.phenos1, Anova, type="II", test="LR")
 
-# Show 
+# Show mean separation letters
 lapply(glm.phenos1,
        function(i) {
          marginal = emmeans(i, ~Construct)
@@ -104,8 +104,8 @@ lapply(glm.phenos1,
        })
 
 
-
 # Plots -------------------------------------------------------------------
+# Proportion in each stage at given date, separated by construct
 Plot_1 <- lapply(unique(phenos.cast$Construct),
       function(i) ggplot(phenos.cast[phenos.cast$Construct==i,],
                          aes(fill=Stage, y=n, x=Date)) +
@@ -114,6 +114,7 @@ Plot_1 <- lapply(unique(phenos.cast$Construct),
         labs(y="Percent") +
         theme(plot.title = element_text(hjust = 0.5)))
 
+# Number of branches on Nov22 by construct, separated by infiltration location
 Plot_2 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                  function(i) ggplot(phenos[phenos$InfiltrationLocation==i,],
                                     aes(x=Construct, y=Branches_Nov22)) +
@@ -125,5 +126,15 @@ Plot_2 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                    theme(plot.title = element_text(hjust = 0.5),
                          plot.subtitle = element_text(hjust=0.5)))
 names(Plot_2) <- unique(phenos$InfiltrationLocation)
+
+# Days to bolting by construct for Rosette leaf infiltration
+Plot_3 <- ggplot(phenos[phenos$InfiltrationLocation=="Rosette",], 
+                 aes(x=Construct, y=D2Bolt)) +
+  labs(y="Days to Bolting") +
+  geom_violin() +
+  ggtitle("Rosette Leaf Infiltration",
+          subtitle=bquote("F"[.(paste(anova(lm.phenos2)[,1], collapse = ","))]*"="*.(round(anova(lm.phenos2)[1,4],3))*", p="*.(round(anova(lm.phenos2)[1,5],3)))) +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5))
       
 
