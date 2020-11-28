@@ -55,27 +55,24 @@ colnames(phenos.melt) <- c("EUID", "Construct", "InfiltrationLocation", "Date", 
 phenos.cast <- phenos.melt %>% count(Construct, InfiltrationLocation, Date, Stage)
 
 # Make a linear model of the data
-lm.phenos1 <- lm(as.numeric(D2Bolt) ~ Construct*InfiltrationLocation,
-                data = phenos)
-lm.phenos2 <- lm(as.numeric(D2Bolt) ~ Construct,
+lm.phenos1 <- lm(as.numeric(D2Bolt) ~ Construct,
                  data = phenos,
                  subset = InfiltrationLocation=="Rosette")
-lm.phenos3 <- lm(n ~ Date*Stage,
-                 data = phenos.cast,
-                 subset = Construct == "euFULII")
+lm.anova1 <- anova(lm.phenos1)
 
+lm.phenos2 <- lapply(unique(phenos$InfiltrationLocation),
+                     function(i) lm(as.numeric(D2FFlower) ~ Construct,
+                                    data = phenos[phenos$InfiltrationLocation==i,]))
+names(lm.phenos2) <- unique(phenos$InfiltrationLocation)
+lm.anova2 <- lapply(lm.phenos2, anova)
+#lapply(lapply(lm.phenos2,aov), TukeyHSD) # ANOVA is ns
 
-summary(lm.phenos1)
-summary(lm.phenos2)
-
-anova(lm.phenos1)
-anova(lm.phenos2)
-anova(lm.phenos3)
-
-TukeyHSD(aov(lm.phenos1))
-TukeyHSD(aov(lm.phenos2))
-
-model.tables(aov(lm.phenos1))
+lm.phenos3 <- lapply(unique(phenos$InfiltrationLocation),
+                        function(i) lm(as.numeric(D2FFruit) ~ Construct,
+                                       data = phenos[phenos$InfiltrationLocation==i,]))
+names(lm.phenos3) <- unique(phenos$InfiltrationLocation)
+lm.anova3 <- lapply(lm.phenos3, anova)
+#lapply(lapply(lm.phenos3,aov), TukeyHSD) # ANOVA is ns
 
 
 # Neg Binomial Models -----------------------------------------------------
@@ -133,8 +130,31 @@ Plot_3 <- ggplot(phenos[phenos$InfiltrationLocation=="Rosette",],
   labs(y="Days to Bolting") +
   geom_violin() +
   ggtitle("Rosette Leaf Infiltration",
-          subtitle=bquote("F"[.(paste(anova(lm.phenos2)[,1], collapse = ","))]*"="*.(round(anova(lm.phenos2)[1,4],3))*", p="*.(round(anova(lm.phenos2)[1,5],3)))) +
+          subtitle=bquote("F"[.(paste(lm.anova1[,1], collapse = ","))]*"="*.(round(lm.anova1[1,4],3))*", p="*.(round(lm.anova1[1,5],3)))) +
   theme(plot.title = element_text(hjust=0.5),
         plot.subtitle = element_text(hjust=0.5))
+
+# Days to first flower by construct separated by infiltration location
+Plot_4 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
+                 function(i) ggplot(phenos[phenos$InfiltrationLocation==i,],
+                                    aes(x=Construct, y=D2FFlower)) +
+                   labs(y="Days to First Flower") +
+                   geom_violin() +
+                   ggtitle(paste(i, "Leaf Infiltration"),
+                           subtitle=bquote("F"[.(paste(lm.anova2[[i]][,1], collapse = ","))]*"="*.(round(lm.anova2[[i]][1,4],3))*", p="*.(round(lm.anova2[[i]][1,5],3)))) +
+                   theme(plot.title = element_text(hjust=0.5),
+                         plot.subtitle = element_text(hjust=0.5)))
+
+# Days to first fruit by construct separated by infiltration location
+Plot_5 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
+                 function(i) ggplot(phenos[phenos$InfiltrationLocation==i,],
+                                    aes(x=Construct, y=D2FFruit)) +
+                   labs(y="Days to First Fruit") +
+                   geom_violin() +
+                   ggtitle(paste(i, "Leaf Infiltration"),
+                           subtitle=bquote("F"[.(paste(lm.anova3[[i]][,1], collapse = ","))]*"="*.(round(lm.anova3[[i]][1,4],3))*", p="*.(round(lm.anova3[[i]][1,5],3)))) +
+                   theme(plot.title = element_text(hjust=0.5),
+                         plot.subtitle = element_text(hjust=0.5)))
+
       
 
