@@ -4,13 +4,16 @@ library(reshape2)
 library(cowplot)
 theme_set(theme_cowplot())
 library(ggsignif)
+library(patchwork)
+library(wesanderson)
 
 # Read in Data
 phenos <- read_sheet("https://docs.google.com/spreadsheets/d/1skhTjnfVESJ_eSaFTbt7_D1w33bDZeJ4WndzfEznxPc/edit?usp=sharing",
                      sheet="Sorted")
 # Massage design factor levels
+phenos$Construct <- dplyr::recode(phenos$Construct, Abeer="All")
 phenos$Construct <- factor(phenos$Construct, 
-                           levels = c("Wild-Type", "Empty Vector", "euFULI", "euFULII", "Abeer"))
+                           levels = c("Wild-Type", "Empty Vector", "euFULI", "euFULII", "All"))
 phenos$InfiltrationLocation <- factor(phenos$InfiltrationLocation,
                                       levels = c("Rosette", "Cauline"))
 # Massage observation columns data
@@ -28,6 +31,8 @@ phenos[,PhenoCols] <-lapply(phenos[,PhenoCols],
 
 # throw out bad plant that was mislabeled
 phenos <- phenos[-c(phenos$EUID==64),]
+
+
 
 # Create Days to Bolting Column
 phenos$D2Bolt <- RelDays[apply(phenos[,PhenoCols],1,  function(x) min(grep("Bolted",x)))]
@@ -49,12 +54,15 @@ phenos$D2FFruit[apply(phenos[,max(PhenoCols)],1,function(x) !grepl("Fruit", x))]
 # Reshape Data for plots
 phenos.melt <- melt(phenos[,c(1:3,PhenoCols)], 
                     id.vars = c("EUID", "Construct", "InfiltrationLocation"))
-phenos.melt$value <- factor(phenos.melt$value, levels=phenotypes)
+phenos.melt$value <- dplyr::recode(phenos.melt$value, Flower1="Flower", Flower2="Flower", Flower3="Flower")
+phenos.melt$value <- factor(phenos.melt$value, 
+                            levels=c("Fruit", "Flower", "Flower Buds", "Bolted", "Vegetative"))
+
 colnames(phenos.melt) <- c("EUID", "Construct", "InfiltrationLocation", "Date", "Stage")
 # Reshape again to summarize
 phenos.cast <- phenos.melt %>% count(Construct, InfiltrationLocation, Date, Stage)
 
-# Make a linear model of the data
+# Linear Models -----------------------------------------------------------
 lm.phenos1 <- lm(as.numeric(D2Bolt) ~ Construct,
                  data = phenos,
                  subset = InfiltrationLocation=="Rosette")
@@ -107,54 +115,117 @@ Plot_1 <- lapply(unique(phenos.cast$Construct),
       function(i) ggplot(phenos.cast[phenos.cast$Construct==i,],
                          aes(fill=Stage, y=n, x=Date)) +
         geom_bar(position="fill", stat="identity") +
+        scale_x_discrete(labels=RelDays) +
+        scale_y_continuous(labels = scales::percent) +
+        scale_fill_manual(drop=FALSE,
+                          values=wes_palette("Zissou1", 5)) +
         ggtitle(i) +
-        labs(y="Percent") +
+        labs(y=element_blank(),
+             x="Days Post Infiltration") +
         theme(plot.title = element_text(hjust = 0.5)))
+names(Plot_1) <- unique(phenos.cast$Construct)
 
 # Number of branches on Nov22 by construct, separated by infiltration location
+pal <- c("#000000FF",
+         "#808080FF",
+         "#2A788EFF",
+         "#FFCC00FF", 
+         "#7AD151FF")
 Plot_2 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                  function(i) ggplot(phenos[phenos$InfiltrationLocation==i,],
-                                    aes(x=Construct, y=Branches_Nov22)) +
-                   geom_violin() +
-                   geom_boxplot(width=0.1) +
+                                    aes(x=Construct, y=Branches_Nov22, fill=Construct)) +
+                   geom_violin(alpha=0.6) +
+                   scale_fill_manual(values=pal) +
                    ggtitle(paste(i, "Leaf Infiltration"),
                            subtitle = bquote("Likelihood Ratio Chi"^2*"="*.(round(nb.anova1[[i]]$`LR Chisq`,2))*", DF="*.(nb.anova1[[i]]$Df)*", p="*.(round(nb.anova1[[i]]$`Pr(>Chisq)`,3)))) +
                    labs(y="Branch Number") +
                    theme(plot.title = element_text(hjust = 0.5),
-                         plot.subtitle = element_text(hjust=0.5)))
+                         plot.subtitle = element_text(hjust=0.5),
+                         legend.position = "none"))
 names(Plot_2) <- unique(phenos$InfiltrationLocation)
 
 # Days to bolting by construct for Rosette leaf infiltration
 Plot_3 <- ggplot(phenos[phenos$InfiltrationLocation=="Rosette",], 
-                 aes(x=Construct, y=D2Bolt)) +
+                 aes(x=Construct, y=D2Bolt, fill=Construct)) +
   labs(y="Days to Bolting") +
-  geom_violin() +
+  geom_violin(alpha=0.6) +
+  scale_fill_manual(values=pal) +
   ggtitle("Rosette Leaf Infiltration",
           subtitle=bquote("F"[.(paste(lm.anova1[,1], collapse = ","))]*"="*.(round(lm.anova1[1,4],3))*", p="*.(round(lm.anova1[1,5],3)))) +
   theme(plot.title = element_text(hjust=0.5),
-        plot.subtitle = element_text(hjust=0.5))
+        plot.subtitle = element_text(hjust=0.5),
+        legend.position = "none")
 
 # Days to first flower by construct separated by infiltration location
 Plot_4 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                  function(i) ggplot(phenos[phenos$InfiltrationLocation==i,],
-                                    aes(x=Construct, y=D2FFlower)) +
+                                    aes(x=Construct, y=D2FFlower, fill=Construct)) +
                    labs(y="Days to First Flower") +
-                   geom_violin() +
+                   geom_violin(alpha=0.6) +
+                   scale_fill_manual(values=pal) +
                    ggtitle(paste(i, "Leaf Infiltration"),
                            subtitle=bquote("F"[.(paste(lm.anova2[[i]][,1], collapse = ","))]*"="*.(round(lm.anova2[[i]][1,4],3))*", p="*.(round(lm.anova2[[i]][1,5],3)))) +
                    theme(plot.title = element_text(hjust=0.5),
-                         plot.subtitle = element_text(hjust=0.5)))
+                         plot.subtitle = element_text(hjust=0.5),
+                         legend.position = "none"))
+names(Plot_4) <- unique(phenos$InfiltrationLocation)
 
 # Days to first fruit by construct separated by infiltration location
 Plot_5 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                  function(i) ggplot(phenos[phenos$InfiltrationLocation==i,],
-                                    aes(x=Construct, y=D2FFruit)) +
+                                    aes(x=Construct, y=D2FFruit, fill=Construct)) +
                    labs(y="Days to First Fruit") +
-                   geom_violin() +
+                   geom_violin(alpha=0.6) +
+                   scale_fill_manual(values=pal) +
                    ggtitle(paste(i, "Leaf Infiltration"),
                            subtitle=bquote("F"[.(paste(lm.anova3[[i]][,1], collapse = ","))]*"="*.(round(lm.anova3[[i]][1,4],3))*", p="*.(round(lm.anova3[[i]][1,5],3)))) +
                    theme(plot.title = element_text(hjust=0.5),
-                         plot.subtitle = element_text(hjust=0.5)))
+                         plot.subtitle = element_text(hjust=0.5),
+                         legend.position = "none"))
+names(Plot_5) <- unique(phenos$InfiltrationLocation)
 
-      
+# Assemble Figures --------------------------------------------------------
+(Plot_1[['euFULI']] + 
+   Plot_1[['euFULII']] + 
+   Plot_1[['All']] + 
+   Plot_1[['Wild-Type']] + 
+   Plot_1[['Empty Vector']] +
+   guide_area()) +
+  plot_layout(guides="collect",
+              nrow=2) +
+  plot_annotation(tag_levels = "A")
+ggsave2("Stage_By_Construct.pdf",
+       height=6,
+       width=9)
 
+(Plot_2[['Rosette']] + Plot_2[['Cauline']]) +
+  plot_annotation(tag_levels = "A")
+ggsave2("Branch_By_ConstructLocation.pdf",
+        height=4,
+        width=12)
+
+Plot_3
+ggsave2("Bolt_By_Construct.pdf",
+        height=4,
+        width=6)
+
+(Plot_4[['Rosette']] + Plot_4[['Cauline']]) +
+  plot_annotation(tag_levels = "A")
+ggsave2("Flower_By_ConstructLocation.pdf",
+        height=4,
+        width=12)
+
+(Plot_5[['Rosette']] + Plot_5[['Cauline']]) +
+  plot_annotation(tag_levels = "A")
+ggsave2("Fruit_By_ConstructLocation.pdf",
+        height=4,
+        width=12)
+
+(Plot_5[['Rosette']] + Plot_5[['Cauline']] +
+    Plot_4[['Rosette']] + Plot_4[['Cauline']] +
+    Plot_3) +
+  plot_layout(nrow=3) +
+  plot_annotation(tag_levels = "A")
+ggsave2("Days_By_ConstructLocation.pdf",
+        height=12,
+        width=12)
