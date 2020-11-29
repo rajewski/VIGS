@@ -7,7 +7,29 @@ library(ggsignif)
 library(patchwork)
 library(wesanderson)
 library(gt)
+library(pwr)
 
+# Power Tests -------------------------------------------------------------
+# Power to detect large effect (f=0.4) with 10 reps per construct
+pwr.anova.test(k=5, n=13, sig.level = 0.05, f=0.4, power=NULL)
+# power to detect smell effect (f=0.1) with 10 reps per construct
+pwr.anova.test(k=5, n=13, sig.level = 0.05, f=0.1, power=NULL)
+# reps needs to detect a small effect with a good power (p=0.8)
+pwr.anova.test(k=5, n=NULL, sig.level = 0.05, f=0.1, power=0.8)
+# reps needs to detect a large effect with a good power (p=0.8)
+pwr.anova.test(k=5, n=NULL, sig.level = 0.05, f=0.4, power=0.8)
+# power test for branching
+# power to detect large effect
+pwr.chisq.test(w=0.5, N=135, df=4, sig.level = 0.05, power=NULL)
+# power to detect medium effect
+pwr.chisq.test(w=0.3, N=135, df=4, sig.level = 0.05, power=NULL)
+# power to detect small effect
+pwr.chisq.test(w=0.1, N=135, df=4, sig.level = 0.05, power=NULL)
+# reps need to detect small branching effect
+pwr.chisq.test(w=0.1, N=NULL, df=4, sig.level = 0.05, power=0.8)
+
+
+# Read and Clean data -----------------------------------------------------
 # Read in Data
 phenos <- read_sheet("https://docs.google.com/spreadsheets/d/1skhTjnfVESJ_eSaFTbt7_D1w33bDZeJ4WndzfEznxPc/edit?usp=sharing",
                      sheet="Sorted")
@@ -34,7 +56,7 @@ phenos[,PhenoCols] <-lapply(phenos[,PhenoCols],
 phenos <- phenos[-c(phenos$EUID==64),]
 
 
-
+# Create Summary Columns --------------------------------------------------
 # Create Days to Bolting Column
 phenos$D2Bolt <- RelDays[apply(phenos[,PhenoCols],1,  function(x) min(grep("Bolted|Flower|Fruit",x)))]
 # Code date for plants we can't see
@@ -53,6 +75,8 @@ phenos$D2FFruit <- RelDays[apply(phenos[,PhenoCols],1,function(x) min(grep("Frui
 # Code date for plants we can't see
 phenos$D2FFruit[apply(phenos[,max(PhenoCols)],1,function(x) !grepl("Fruit", x))] <- 40
 
+
+# Melt and Ccst data for summary ------------------------------------------
 # Reshape Data for plots
 phenos.melt <- melt(phenos[,c(1:3,PhenoCols)], 
                     id.vars = c("EUID", "Construct", "InfiltrationLocation"))
