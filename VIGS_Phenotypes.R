@@ -6,6 +6,7 @@ theme_set(theme_cowplot())
 library(ggsignif)
 library(patchwork)
 library(wesanderson)
+library(gt)
 
 # Read in Data
 phenos <- read_sheet("https://docs.google.com/spreadsheets/d/1skhTjnfVESJ_eSaFTbt7_D1w33bDZeJ4WndzfEznxPc/edit?usp=sharing",
@@ -229,3 +230,15 @@ ggsave2("Fruit_By_ConstructLocation.pdf",
 ggsave2("Days_By_ConstructLocation.pdf",
         height=12,
         width=12)
+
+
+# Replicates Table --------------------------------------------------------
+phenos %>% 
+  count(InfiltrationLocation, Construct) %>% 
+  spread(Construct, n) %>%
+  column_to_rownames("InfiltrationLocation") %>%
+  gt(rownames_to_stub = TRUE) %>%
+  tab_header(title=md("**Summary of Replicates**")) %>%
+  gtsave("Replicates_Table.png")
+
+
