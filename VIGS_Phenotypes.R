@@ -36,9 +36,10 @@ phenos <- phenos[-c(phenos$EUID==64),]
 
 
 # Create Days to Bolting Column
-phenos$D2Bolt <- RelDays[apply(phenos[,PhenoCols],1,  function(x) min(grep("Bolted",x)))]
+phenos$D2Bolt <- RelDays[apply(phenos[,PhenoCols],1,  function(x) min(grep("Bolted|Flower|Fruit",x)))]
 # Code date for plants we can't see
 phenos$D2Bolt[phenos[max(PhenoCols)]=="Vegetative"] <- 40
+#phenos$D2Bolt[apply(phenos[,c(max(PhenoCols))],1,function(x) grepl("Vegetative", x))] <- 40
 phenos$D2Bolt[phenos[min(PhenoCols)]=="Flower Buds"] <- 3
 
 # Create a Days to First Flower Column
@@ -89,16 +90,20 @@ library(MASS)
 library(car)
 library(emmeans)
 #Create the model for each infiltration location separately
-glm.phenos1 <- lapply(unique(phenos$InfiltrationLocation),
+glm.phenos1 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                      function(i) glm.nb(Branches_Nov22 ~ Construct,
                                         control=glm.control(maxit = 1000),
                                         data=phenos[phenos$InfiltrationLocation==i,]))
-names(glm.phenos1) <- unique(phenos$InfiltrationLocation)
+glm.phenos2 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
+                      function(i) glm(Branches_Nov22 ~ Construct,
+                                         family="poisson",
+                                         data=phenos[phenos$InfiltrationLocation==i,]))
+names(glm.phenos2) <- unique(phenos$InfiltrationLocation)
 # Show ANOVA tables
-nb.anova1 <- lapply(glm.phenos1, Anova, type="II", test="LR")
+nb.anova2 <- lapply(glm.phenos2, Anova, type="II", test="LR")
 
 # Show mean separation letters
-lapply(glm.phenos1,
+lapply(glm.phenos2,
        function(i) {
          marginal = emmeans(i, ~Construct)
          #pwpm(marginal, adjust="tukey") # Redundant, but useful sometimes
@@ -138,7 +143,7 @@ Plot_2 <- lapply(as.character(unique(phenos$InfiltrationLocation)),
                    geom_violin(alpha=0.6) +
                    scale_fill_manual(values=pal) +
                    ggtitle(paste(i, "Leaf Infiltration"),
-                           subtitle = bquote("Likelihood Ratio Chi"^2*"="*.(round(nb.anova1[[i]]$`LR Chisq`,2))*", DF="*.(nb.anova1[[i]]$Df)*", p="*.(round(nb.anova1[[i]]$`Pr(>Chisq)`,3)))) +
+                           subtitle = bquote("Likelihood Ratio Chi"^2*"="*.(round(nb.anova2[[i]]$`LR Chisq`,2))*", DF="*.(nb.anova2[[i]]$Df)*", p="*.(round(nb.anova2[[i]]$`Pr(>Chisq)`,3)))) +
                    labs(y="Branch Number") +
                    theme(plot.title = element_text(hjust = 0.5),
                          plot.subtitle = element_text(hjust=0.5),
@@ -233,12 +238,22 @@ ggsave2("Days_By_ConstructLocation.pdf",
 
 
 # Replicates Table --------------------------------------------------------
-phenos %>% 
-  count(InfiltrationLocation, Construct) %>% 
+phenos %>%
+  count(InfiltrationLocation, Construct) %>%
   spread(Construct, n) %>%
+  mutate('\u03A3'=rowSums(.[2:6])) %>%
   column_to_rownames("InfiltrationLocation") %>%
   gt(rownames_to_stub = TRUE) %>%
   tab_header(title=md("**Summary of Replicates**")) %>%
+  grand_summary_rows(columns = 2:7,
+                     fns = list(
+                       '\u03A3' = "sum"),
+                     decimals=0) %>%
+  tab_style(locations = list(cells_grand_summary(),
+                             cells_column_labels(columns = 6),
+                             cells_body(columns = 7)),
+            style = list(cell_text(weight = "bold"))) %>%
   gtsave("Replicates_Table.png")
+
 
 
